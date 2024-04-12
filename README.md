@@ -1,4 +1,4 @@
-# llama2_GUI
+# llama2-GUI
 
 This is a GUI project that runs llama2 locally.
 
@@ -17,9 +17,9 @@ This is a GUI project that runs llama2 locally.
    
 
 ## Installation Steps
-1. git clone llama2_GUI
+1. git clone llama2-GUI
    ```
-   git clone git@github.com:joesnason/llama2_GUI.git
+   git clone git@github.com:joesnason/llama2-GUI.git
    ```
 2. install python packages
    ```
