@@ -1,74 +1,89 @@
-import tkinter as tk
+import sys
+from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTextEdit, QLineEdit, QPushButton, QLabel
+from PyQt6.QtCore import Qt, QObject, pyqtSignal
 from langchain_community.llms import Ollama
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
 from langchain.callbacks.manager import CallbackManager
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 
+class LLMStreamingCallback(StreamingStdOutCallbackHandler, QObject):
+    new_token = pyqtSignal(str)
 
-
-
-class LLMStreamingCallback(StreamingStdOutCallbackHandler):
     def __init__(self):
         super().__init__()
-        #self.text = ""
+        QObject.__init__(self)
+
     def on_llm_new_token(self, token: str, **kwargs: any):
-        #self.text += token
-        token= token.replace('\n', '')
-        response["text"] = response["text"] + token
-        #print(token)
-        window.update()
+        token = token.replace('\n', '')
+        self.new_token.emit(token)
 
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Llama3 UI")
+        self.setGeometry(100, 100, 800, 600)
 
-def HelloMsg():
-    system_prompt = textbox_systemprompt.get("1.0", tk.END)
-    user_prompt = input_textedit.get()
-    response["text"] = response["text"] + "\n" + "User: " + user_prompt
-    prompt = ChatPromptTemplate.from_messages([
-    ("system", system_prompt),    
-    ("user", user_prompt),
-])
-    chain = prompt | llm  
-    context = response["text"] + "\n"  + "AI: " # +  chain.invoke({"user_prompt": user_prompt}) 
-    response.config(text=context, anchor="nw")
-    chain.invoke({"user_prompt": user_prompt})
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        layout = QVBoxLayout(central_widget)
 
-window = tk.Tk()
-window.title("Tkinter Test")
-window.geometry("800x600")
+        title = QLabel("Local Llama3 test")
+        title.setStyleSheet("background-color: yellow; font-size: 24px; padding: 10px;")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)  # 添加這行來置中文本
+        layout.addWidget(title)
 
-llm = Ollama(model='llama3', callback_manager=CallbackManager([LLMStreamingCallback()]))
+        self.system_prompt = QTextEdit(" Always response in Chinese(中文), not English")
+        self.system_prompt.setFixedHeight(100)
+        layout.addWidget(self.system_prompt)
 
+        self.response = QTextEdit()
+        self.response.setReadOnly(True)
+        self.response.setStyleSheet("background-color: lightblue;")
+        layout.addWidget(self.response)
 
-title = tk.Label(window, text="Local Llama3  test", font=("Arial", 24), bg="yellow")
-title.pack()
+        input_layout = QHBoxLayout()
+        self.user_input = QLineEdit()
+        self.user_input.returnPressed.connect(self.send_message)  # 添加這行
+        input_layout.addWidget(self.user_input)
+        
+        send_button = QPushButton("Send")
+        send_button.clicked.connect(self.send_message)
+        input_layout.addWidget(send_button)
+        
+        layout.addLayout(input_layout)
 
-textbox_systemprompt = tk.Text(window,  height=5, width=100, font=("Arial", 12))
-textbox_systemprompt.insert(tk.END, "你是一個英翻中的專家。請翻譯下列英文句子成繁體中文")
-textbox_systemprompt.pack()
+        self.callback = LLMStreamingCallback()
+        self.callback.new_token.connect(self.update_response)
+        self.llm = Ollama(model='llama3', callback_manager=CallbackManager([self.callback]))
 
+    def send_message(self):
+        user_prompt = self.user_input.text().strip()  # 使用 strip() 去除首尾空白
+        if not user_prompt:  # 如果輸入為空，直接返回
+            return
+        
+        system_prompt = self.system_prompt.toPlainText()
+        self.response.append(f"\nUser: {user_prompt}")
+        self.response.append("AI: ")
+        
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", system_prompt),
+            ("user", user_prompt),
+        ])
+        chain = prompt | self.llm
+        chain.invoke({"user_prompt": user_prompt})
+        
+        self.user_input.clear()
 
-#response = tk.Label(window, text="This is a long text that will be displayed from left to right and supports line breaks.", height=20, width=100, wraplength=2000 , font=("Arial", 12), bg="lightblue", anchor=tk.NW)
-response = tk.Label(window, text="", height=20, width=100, wraplength=2000 , font=("Arial", 12), bg="lightblue", anchor="nw", justify="left")
-response.pack()
+    def update_response(self, token):
+        self.response.insertPlainText(token)
+        self.response.ensureCursorVisible()
 
+def main():
+    app = QApplication(sys.argv)
+    window = MainWindow()
+    window.show()
+    sys.exit(app.exec())
 
-
-input_frame = tk.Frame(window)
-input_frame.pack()  
-
-input_textedit = tk.Entry(input_frame, width=90, font=("Arial", 12))
-input_textedit.pack(side=tk.LEFT)
-
-btn=tk.Button(input_frame, text="send", command=HelloMsg)
-btn.pack(side=tk.LEFT, padx=5)
-
-input_textedit.focus_set()
-
-
-
-window.update()
-
-window.mainloop()
-
+if __name__ == "__main__":
+    main()
 
